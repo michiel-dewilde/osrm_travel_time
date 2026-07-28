@@ -1,7 +1,7 @@
 {
   "domain": "osrm_travel_time",
   "name": "Open Source Routing Machine travel time",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "documentation": "https://github.com/michiel-dewilde/osrm_travel_time",
   "issue_tracker": "https://github.com/michiel-dewilde/osrm_travel_time/issues",
   "dependencies": [],

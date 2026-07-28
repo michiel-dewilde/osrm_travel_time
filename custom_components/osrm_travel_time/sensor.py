@@ -1,5 +1,6 @@
 """Support for osrm_travel_time sensors."""
 from datetime import timedelta
+import hashlib
 import logging
 from typing import Callable, Dict, Optional, Union, List
 import re
@@ -164,8 +165,15 @@ async def async_setup_platform(
         None, None, origin_name, destination_name, server_address, travel_mode, show_route, units
     )
 
+    # Give each sensor a stable unique_id (derived from its routing config) so it
+    # is registered in the entity registry and can be renamed / labelled / moved
+    # to an area from the UI. Upstream set none, leaving these entities unmanaged.
+    unique_id = hashlib.sha1(
+        f"{server_address}|{travel_mode}|{origin}|{destination}".encode()
+    ).hexdigest()[:16]
+
     sensor = OSRMTravelTimeSensor(
-        hass, name, origin, destination, osrm_data, min_update_interval
+        hass, name, origin, destination, osrm_data, min_update_interval, unique_id
     )
 
     hass.data[DATA_KEY].append(sensor)
@@ -183,11 +191,13 @@ class OSRMTravelTimeSensor(Entity):
         destination: str,
         osrm_data: "OSRMTravelTimeData",
         min_update_interval: int = DEFAULT_MIN_UPDATE_INTERVAL,
+        unique_id: Optional[str] = None,
     ) -> None:
         """Initialize the sensor."""
         self._hass = hass
         self._name = name
         self._osrm_data = osrm_data
+        self._attr_unique_id = unique_id
         self._unit_of_measurement = TIME_MINUTES
         self._origin_entity_id = None
         self._destination_entity_id = None

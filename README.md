@@ -12,10 +12,14 @@
 > - Use raw-string regex literals (silences `SyntaxWarning: invalid escape
 >   sequence`).
 >
-> It also adds one feature: **event-driven updates**. When origin/destination
-> are entities, the sensor recomputes on each of their state changes (e.g. every
-> GPS position update) throttled by the new `min_update_interval` option
-> (default 5 s), instead of only polling on `scan_interval`.
+> It also adds two improvements:
+> - **Event-driven updates.** When origin/destination are entities, the sensor
+>   recomputes on each of their state changes (e.g. every GPS position update),
+>   throttled by the new `min_update_interval` option (default 5 s), instead of
+>   only polling on `scan_interval`.
+> - **Stable `unique_id`.** Each sensor is now registered in the entity registry
+>   (derived from its routing config), so it can be renamed, labelled, or moved
+>   to an area from the UI. Upstream set none, leaving the entities unmanaged.
 >
 > Behaviour is otherwise identical to upstream.
 
