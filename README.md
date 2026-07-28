@@ -1,4 +1,19 @@
 # OSRM Travel Time sensor for Home Assistant (osrm_travel_time)
+
+> **Fork notice.** This is a maintenance fork of
+> [edekeijzer/osrm_travel_time](https://github.com/edekeijzer/osrm_travel_time)
+> (all credit to the original author). It carries small fixes to keep the
+> platform working on current Home Assistant cores:
+> - Replace constants removed from `homeassistant.const`
+>   (`TIME_MINUTES` → `UnitOfTime.MINUTES`, and the removed
+>   `CONF_UNIT_SYSTEM_IMPERIAL` / `CONF_UNIT_SYSTEM_METRIC`), which otherwise
+>   make the platform fail to import.
+> - Replace the removed `hass.config.units.name` with a `METRIC_SYSTEM` check.
+> - Use raw-string regex literals (silences `SyntaxWarning: invalid escape
+>   sequence`).
+>
+> Behaviour is otherwise identical to upstream.
+
 This plugin is heavily based on https://github.com/eifinger/open_route_service and modified to use the https://pypi.org/project/osrm-py/ client for OSRM for making completely self-contained travel times in possible in Home Assistant.
 You can specify origin and destination by either a device_tracker, zone or person entity_id or by latitude/longitude coordinates.
 

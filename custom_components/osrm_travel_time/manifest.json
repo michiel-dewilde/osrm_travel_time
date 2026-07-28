@@ -1,12 +1,13 @@
 {
   "domain": "osrm_travel_time",
   "name": "Open Source Routing Machine travel time",
-  "version": "0.3",
-  "documentation": "https://github.com/edekeijzer/osrm_travel_time",
-  "issue_tracker": "https://github.com/edekeijzer/osrm_travel_time/issues",
+  "version": "0.4.0",
+  "documentation": "https://github.com/michiel-dewilde/osrm_travel_time",
+  "issue_tracker": "https://github.com/michiel-dewilde/osrm_travel_time/issues",
   "dependencies": [],
   "codeowners": [
-    "@edekeijzer"
+    "@edekeijzer",
+    "@michiel-dewilde"
   ],
   "requirements": [
     "osrm-py==0.5"

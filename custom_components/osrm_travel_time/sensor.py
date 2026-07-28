@@ -15,10 +15,16 @@ from homeassistant.const import (
     CONF_MODE,
     CONF_NAME,
     CONF_UNIT_SYSTEM,
-    CONF_UNIT_SYSTEM_IMPERIAL,
-    CONF_UNIT_SYSTEM_METRIC,
-    TIME_MINUTES
+    UnitOfTime,
 )
+from homeassistant.util.unit_system import METRIC_SYSTEM
+
+# Compat shim: TIME_MINUTES and CONF_UNIT_SYSTEM_IMPERIAL/METRIC were removed
+# from homeassistant.const in newer HA cores. Keep the same values the rest of
+# this (upstream, unmaintained) platform expects.
+TIME_MINUTES = UnitOfTime.MINUTES
+CONF_UNIT_SYSTEM_IMPERIAL = "imperial"
+CONF_UNIT_SYSTEM_METRIC = "metric"
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import location
 import homeassistant.helpers.config_validation as cv
@@ -41,9 +47,9 @@ CONF_SHOW_ROUTE = "show_route"
 DEFAULT_NAME = "OSRM Travel Time"
 ATTRIBUTION = "Powered by Open Source Routing Machine"
 
-TRAVEL_MODE_BICYCLE = "^(bike|bicycle)(\-\S+)*$"
-TRAVEL_MODE_CAR = "^(car|auto)(\-\S+)*$"
-TRAVEL_MODE_PEDESTRIAN = "^(foot|walk)(\-\S+)*$"
+TRAVEL_MODE_BICYCLE = r"^(bike|bicycle)(\-\S+)*$"
+TRAVEL_MODE_CAR = r"^(car|auto)(\-\S+)*$"
+TRAVEL_MODE_PEDESTRIAN = r"^(foot|walk)(\-\S+)*$"
 
 SHOW_ROUTE_FULL = "full"
 SHOW_ROUTE_SUMMARY = "summary"
@@ -138,7 +144,10 @@ async def async_setup_platform(
     travel_mode = config.get(CONF_MODE)
     show_route = config.get(CONF_SHOW_ROUTE)
     name = config.get(CONF_NAME)
-    units = config.get(CONF_UNIT_SYSTEM, hass.config.units.name)
+    units = config.get(
+        CONF_UNIT_SYSTEM,
+        CONF_UNIT_SYSTEM_METRIC if hass.config.units is METRIC_SYSTEM else CONF_UNIT_SYSTEM_IMPERIAL,
+    )
 
     osrm_data = OSRMTravelTimeData(
         None, None, origin_name, destination_name, server_address, travel_mode, show_route, units
