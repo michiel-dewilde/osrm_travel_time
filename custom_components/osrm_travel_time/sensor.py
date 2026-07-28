@@ -25,10 +25,14 @@ from homeassistant.util.unit_system import METRIC_SYSTEM
 TIME_MINUTES = UnitOfTime.MINUTES
 CONF_UNIT_SYSTEM_IMPERIAL = "imperial"
 CONF_UNIT_SYSTEM_METRIC = "metric"
-from homeassistant.core import HomeAssistant, State
+from homeassistant.core import HomeAssistant, State, callback
 from homeassistant.helpers import location
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,8 +47,13 @@ CONF_ORIGIN_NAME = "origin_name"
 CONF_SERVER_ADDR = "server"
 CONF_MODE = "profile"
 CONF_SHOW_ROUTE = "show_route"
+CONF_MIN_UPDATE_INTERVAL = "min_update_interval"
 
 DEFAULT_NAME = "OSRM Travel Time"
+# When origin/destination are entities, recompute on their state changes but no
+# more often than this many seconds (0 disables event-driven updates and leaves
+# only the periodic scan_interval poll).
+DEFAULT_MIN_UPDATE_INTERVAL = 5
 ATTRIBUTION = "Powered by Open Source Routing Machine"
 
 TRAVEL_MODE_BICYCLE = r"^(bike|bicycle)(\-\S+)*$"
@@ -102,6 +111,7 @@ PLATFORM_SCHEMA = vol.All(
             vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
             vol.Optional(CONF_MODE, default=TRAVEL_MODE_CAR): cv.string,
             vol.Optional(CONF_SHOW_ROUTE, default=SHOW_ROUTE_SUMMARY): vol.In(SHOW_ROUTE),
+            vol.Optional(CONF_MIN_UPDATE_INTERVAL, default=DEFAULT_MIN_UPDATE_INTERVAL): cv.positive_int,
             vol.Optional(CONF_UNIT_SYSTEM): vol.In(UNITS),
         }
     ),
@@ -144,6 +154,7 @@ async def async_setup_platform(
     travel_mode = config.get(CONF_MODE)
     show_route = config.get(CONF_SHOW_ROUTE)
     name = config.get(CONF_NAME)
+    min_update_interval = config.get(CONF_MIN_UPDATE_INTERVAL)
     units = config.get(
         CONF_UNIT_SYSTEM,
         CONF_UNIT_SYSTEM_METRIC if hass.config.units is METRIC_SYSTEM else CONF_UNIT_SYSTEM_IMPERIAL,
@@ -153,7 +164,9 @@ async def async_setup_platform(
         None, None, origin_name, destination_name, server_address, travel_mode, show_route, units
     )
 
-    sensor = OSRMTravelTimeSensor(hass, name, origin, destination, osrm_data)
+    sensor = OSRMTravelTimeSensor(
+        hass, name, origin, destination, osrm_data, min_update_interval
+    )
 
     hass.data[DATA_KEY].append(sensor)
 
@@ -169,6 +182,7 @@ class OSRMTravelTimeSensor(Entity):
         origin: str,
         destination: str,
         osrm_data: "OSRMTravelTimeData",
+        min_update_interval: int = DEFAULT_MIN_UPDATE_INTERVAL,
     ) -> None:
         """Initialize the sensor."""
         self._hass = hass
@@ -177,6 +191,9 @@ class OSRMTravelTimeSensor(Entity):
         self._unit_of_measurement = TIME_MINUTES
         self._origin_entity_id = None
         self._destination_entity_id = None
+        self._min_update_interval = min_update_interval
+        self._last_update_mono = 0.0
+        self._pending_update = None
 
         # Check if location is a trackable entity
         if origin.split(".", 1)[0] in TRACKABLE_DOMAINS:
@@ -188,6 +205,56 @@ class OSRMTravelTimeSensor(Entity):
             self._destination_entity_id = destination
         else:
             self._osrm_data.destination = destination
+
+    async def async_added_to_hass(self) -> None:
+        """Recompute whenever a tracked origin/destination entity moves.
+
+        Position updates (e.g. a phone or e-bike device_tracker) fire a state
+        change; we refresh on each, throttled to min_update_interval seconds so
+        a fast GPS stream can't outrun the router. The periodic scan_interval
+        poll remains as a fallback. Set min_update_interval to 0 to disable.
+        """
+        if not self._min_update_interval:
+            return
+        tracked = [
+            e for e in (self._origin_entity_id, self._destination_entity_id) if e
+        ]
+        if not tracked:
+            return
+        self.async_on_remove(
+            async_track_state_change_event(self._hass, tracked, self._source_changed)
+        )
+        self.async_on_remove(self._cancel_pending)
+
+    @callback
+    def _cancel_pending(self) -> None:
+        """Cancel any queued deferred update (on entity removal)."""
+        if self._pending_update is not None:
+            self._pending_update()
+            self._pending_update = None
+
+    @callback
+    def _source_changed(self, event) -> None:
+        """Throttle updates to at most one per min_update_interval seconds."""
+        if self._pending_update is not None:
+            return  # an update is already queued for the throttle window
+        elapsed = self._hass.loop.time() - self._last_update_mono
+        if elapsed >= self._min_update_interval:
+            self._last_update_mono = self._hass.loop.time()
+            self.async_schedule_update_ha_state(True)
+        else:
+            self._pending_update = async_call_later(
+                self._hass,
+                self._min_update_interval - elapsed,
+                self._deferred_update,
+            )
+
+    @callback
+    def _deferred_update(self, _now) -> None:
+        """Fire the coalesced update at the end of the throttle window."""
+        self._pending_update = None
+        self._last_update_mono = self._hass.loop.time()
+        self.async_schedule_update_ha_state(True)
 
     @property
     def state(self) -> Optional[str]:

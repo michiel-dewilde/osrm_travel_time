@@ -12,6 +12,11 @@
 > - Use raw-string regex literals (silences `SyntaxWarning: invalid escape
 >   sequence`).
 >
+> It also adds one feature: **event-driven updates**. When origin/destination
+> are entities, the sensor recomputes on each of their state changes (e.g. every
+> GPS position update) throttled by the new `min_update_interval` option
+> (default 5 s), instead of only polling on `scan_interval`.
+>
 > Behaviour is otherwise identical to upstream.
 
 This plugin is heavily based on https://github.com/eifinger/open_route_service and modified to use the https://pypi.org/project/osrm-py/ client for OSRM for making completely self-contained travel times in possible in Home Assistant.
@@ -52,7 +57,8 @@ Key | Type | Required | Description
 `name` | `string` | `false` | A name to display on the sensor. The default is *OSRM Travel Time*.
 `profile` | `string` | `false` | Enter a profile name here, which exists in your OSRM server. The default is *car*.
 `unit_system` | `string` | `false` | You can choose between `metric` or `imperial`. The default is to follow your Home Assistant configuration.
-`scan_interval` | `integer` | `false` | "Defines the update interval of the sensor in seconds. Defaults to *300* (5 minutes)."
+`scan_interval` | `integer` | `false` | "Defines the periodic (fallback) update interval of the sensor in seconds. Defaults to *300* (5 minutes)."
+`min_update_interval` | `integer` | `false` | When `origin_entity_id`/`destination_entity_id` are used, the sensor also recomputes on each of their state changes (e.g. every GPS position update), throttled to at most once per this many seconds. Defaults to *5*. Set to *0* to disable event-driven updates and rely only on `scan_interval`.
 
 ## Roadmap
 Things I'd like to add
